@@ -11,7 +11,11 @@ stuff <- lapply(files, function(x) {
 
   train_ <- scaled[index,]
   test_ <- scaled[-index,]
-  str(test_)
-  #apply(train_, 2, function (x) {cat(x, '\n')})
-  #cat('\n')
+  str(train_)
+  names(train_) <- "price"
+  str(names(train_))
+  library(neuralnet)
+  #f <- as.formula(paste(" ~", paste(n[!n %in% "NULL"], collapse = " + ")))
+  f <- as.formula("~ price")
+  nn <- neuralnet(f,data=train_,hidden=c(5,3),linear.output=T)
 })
