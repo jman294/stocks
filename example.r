@@ -37,7 +37,9 @@ test_ <- scaled[-index,]
 # NN training
 library(neuralnet)
 n <- names(train_)
+str(n)
 f <- as.formula(paste("medv ~", paste(n[!n %in% "medv"], collapse = " + ")))
+str(f)
 nn <- neuralnet(f,data=train_,hidden=c(5,3),linear.output=T)
 
 # Visual plot of the model
