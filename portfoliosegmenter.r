@@ -1,6 +1,6 @@
 files <- list.files(path="./histdaily", pattern="table_x.*.csv$")
 stuff <- lapply(files, function(x) {
-  data <- read.csv(file=paste('./histdaily/', x, sep=''), head=FALSE, sep=",") # load file
+  data <- read.csv(file=paste('./histdaily/', x, sep=''), head=FALSE, sep=",", colClasses=c("NULL", "NULL", NA, "NULL", "NULL", "NULL", "NULL"))
   index <- sample(1:nrow(data),round(0.75*nrow(data)))
   train <- data[index,]
   test <- data[-index,]
@@ -11,5 +11,7 @@ stuff <- lapply(files, function(x) {
 
   train_ <- scaled[index,]
   test_ <- scaled[-index,]
-  apply(train_, 2, cat)
+  str(test_)
+  #apply(train_, 2, function (x) {cat(x, '\n')})
+  #cat('\n')
 })
