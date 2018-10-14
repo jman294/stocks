@@ -67,34 +67,31 @@ stuff <- lapply(files, function(x) {
   batch_size = 1                # must be a common factor of both the train and test samples
   units = 1                     # can adjust this, in model tuninig phase
 
-  model <- trainr(y_train, x_train, model=model, learningrate=1, hidden_dim=16, network_type="lstm")
+  model <- trainr(y_train, x_train, model=model, learningrate=.05, hidden_dim=1, network_type="lstm")
 
   L = length(x_test)
   scaler = Scaled$scaler
   predictions = numeric(L)
 
-  for(i in 1:L){
-       X = x_test[i]
-       dim(X) = c(1,1,1)
-       yhat = predictr(model, X)
-       # invert scaling
-       yhat = invert_scaling(yhat, scaler,  c(-1, 1))
+  dim(x_test) <- c(length(x_test), 1, 1)
+  ipreds = predictr(model, x_test)
+  #predictions <- lapply(predictions, function(x) {
+    #yhat = invert_scaling(x, scaler,  c(-1, 1))
+    ## invert differencing
+    #yhat = yhat + data$V3[(n+i)]
+    #yhat
+  #})
+
+  for(i in 1:length(ipreds)){
+       yhat = invert_scaling(ipreds[i], scaler,  c(-1, 1))
        # invert differencing
        yhat  = yhat + data$V3[(n+i)]
        # store
        predictions[i] <- yhat
   }
+
   # Plot predicted vs actual. Training set + testing set
-  plot(as.vector(data$V3), col = 'red', type = 'l', main = "Actual vs predicted", ylab = "Y,Yp")
-  lines(as.vector(predictions), type = 'l', col = 'blue')
+  plot(data, col = 'red', type = 'l', main = "Actual vs predicted", ylab = "Y,Yp")
+  lines(as.vector(data$V1[(N-L+1):N]), y=as.vector(predictions), type = 'l', col = 'blue')
   legend("topright", c("Predicted", "Real"), col = c("blue","red"), lty = c(1,1), lwd = c(1,1))
-
-  #=========================================================================================
-  #library(keras)
-  #library(tensorflow)
-
-  #model <- keras_model_sequential()
-  #model%>%
-    #layer_lstm(units, batch_input_shape = c(batch_size, X_shape2, X_shape3), stateful= TRUE)%>%
-    #layer_dense(units = 1)
 })
