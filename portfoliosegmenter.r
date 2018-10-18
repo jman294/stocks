@@ -1,6 +1,6 @@
-library(rnn)
+library(keras)
 
-files <- list.files(path="./histdaily", pattern="table_x.csv$")
+files <- list.files(path="./histdaily", pattern="table_x.*.csv$")
 
 lag_transform <- function(x, k= 1){
   lagged =  c(rep(NA, k), x[1:(length(x)-k)])
@@ -20,10 +20,10 @@ scale_data = function(train, test, feature_range = c(0, 1)) {
   scaled_train = std_train *(fr_max -fr_min) + fr_min
   scaled_test = std_test *(fr_max -fr_min) + fr_min
 
-  return( list(scaled_train = as.vector(scaled_train), scaled_test = as.vector(scaled_test) ,scaler= c(min =min(x), max = max(x))) )
+  return( list(scaled_train = as.vector(scaled_train), scaled_test = as.vector(scaled_test), scaler= c(min =min(x), max = max(x))) )
 }
 
-## inverse-transform
+# inverse-transform
 invert_scaling = function(scaled, scaler, feature_range = c(0, 1)){
   min = scaler[1]
   max = scaler[2]
@@ -45,7 +45,7 @@ stuff <- lapply(files, function(x) {
   setClass("myDate")
   setAs("character", "myDate", function(from) as.Date(from, format="%Y%m%d") )
   data <- read.csv(file=paste('./histdaily/', x, sep=''), head=FALSE, sep=",", colClasses=c("myDate", "NULL", NA, "NULL", "NULL", "NULL", "NULL"))
-  diff <- diff(data$V3)
+  diff <- diff(data$V3, differences = 1)
   supervised = lag_transform(diff)
   N = nrow(supervised)
   n = round(N *0.7, digits = 0)
@@ -55,11 +55,12 @@ stuff <- lapply(files, function(x) {
 
   y_train = Scaled$scaled_train[, 2]
   x_train = Scaled$scaled_train[, 1]
+
   y_test = Scaled$scaled_test[, 2]
   x_test = Scaled$scaled_test[, 1]
   # Reshape the input to 3-dim
   dim(x_train) <- c(length(x_train), 1, 1)
-  dim(y_train) <- c(length(y_train), 1, 1)
+  dim(x_train)
 
   # specify required arguments
   X_shape2 = dim(x_train)[2]
@@ -67,23 +68,33 @@ stuff <- lapply(files, function(x) {
   batch_size = 1                # must be a common factor of both the train and test samples
   units = 1                     # can adjust this, in model tuninig phase
 
-  model <- trainr(y_train, x_train, model=model, learningrate=.05, hidden_dim=1, network_type="lstm")
+  #=========================================================================================
 
+  model <- keras_model_sequential()
+  model%>%
+    layer_lstm(units, batch_input_shape = c(batch_size, X_shape2, X_shape3), stateful= TRUE)%>%
+    layer_dense(units = 1)
+  model %>% compile(
+    loss = 'mean_squared_error',
+    optimizer = optimizer_adam( lr= 0.0002, decay = 1e-6 ),
+    metrics = c('accuracy')
+  )
+  str(summary(model))
+  Epochs = 1
+  for(i in 1:Epochs ){
+    model %>% fit(x_train, y_train, epochs=1, batch_size=batch_size, verbose=1, shuffle=FALSE)
+    model %>% reset_states()
+  }
   L = length(x_test)
   scaler = Scaled$scaler
   predictions = numeric(L)
 
-  dim(x_test) <- c(length(x_test), 1, 1)
-  ipreds = predictr(model, x_test)
-  #predictions <- lapply(predictions, function(x) {
-    #yhat = invert_scaling(x, scaler,  c(-1, 1))
-    ## invert differencing
-    #yhat = yhat + data$V3[(n+i)]
-    #yhat
-  #})
-
-  for(i in 1:length(ipreds)){
-       yhat = invert_scaling(ipreds[i], scaler,  c(-1, 1))
+  for(i in 1:L){
+       X = x_test[i]
+       dim(X) = c(1,1,1)
+       yhat = model %>% predict(X, batch_size=batch_size)
+       # invert scaling
+       yhat = invert_scaling(yhat, scaler,  c(-1, 1))
        # invert differencing
        yhat  = yhat + data$V3[(n+i)]
        # store
@@ -91,7 +102,8 @@ stuff <- lapply(files, function(x) {
   }
 
   # Plot predicted vs actual. Training set + testing set
-  plot(data, col = 'red', type = 'l', main = "Actual vs predicted", ylab = "Y,Yp")
+  plot(data, col = 'red', type = 'l', main = "Actual vs predicted", ylab = "Price")
   lines(as.vector(data$V1[(N-L+1):N]), y=as.vector(predictions), type = 'l', col = 'blue')
+  lines(predictions)
   legend("topright", c("Predicted", "Real"), col = c("blue","red"), lty = c(1,1), lwd = c(1,1))
 })
