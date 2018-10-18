@@ -13,14 +13,13 @@ get_stock_data <- function (stock) {
   result = tryCatch({
     contentStats <- fromJSON(rawToChar(rawStats$content))
     contentFinancials <- fromJSON(rawToChar(rawFinancials$content))
-    cat(str(c(contentStats, contentFinancials)))
   }, warning = function(w) {
   }, error = function(e) {
     return(NULL)
     stop()
   }, finally = {
   })
-  return(content)
+  return(c(contentStats, contentFinancials))
   Sys.sleep(1)
 }
 
@@ -79,6 +78,21 @@ get_average_roa <- function (stock_data) {
   return(sum/count)
 }
 
+get_average_debt_ratio <- function (stock_data) {
+  sum <- 0
+  count <- 0
+  for (i in stock_data) {
+    if (!(is.na(i$financials[1, 'totalDebt']) ||
+          is.null(i$financials[1, 'totalDebt']) ||
+          is.null(i$financials[1, 'totalAssets']) ||
+          is.na(i$financials[1, 'totalAssets']))) {
+      sum = sum + i$financials[1, 'totalDebt'] / i$financials[1, 'totalAssets']
+      count = count + 1
+    }
+  }
+  return(sum/count)
+}
+
 
 # Innovation
 # Percent headlines mentioning company and "new"
@@ -98,10 +112,13 @@ for (i in list.files('./sectors/rstockdata')) {
   stocks <- read_stock_data(paste('./sectors/rstockdata/', i, sep=''))
   totalMarketCap <- get_total_market_cap(stocks)
   averageROA <- get_average_roa(stocks)
-  cat('\n\n\n\n')
+  averageDebtRatio <- get_average_debt_ratio(stocks)
+  cat('\n\n\n')
   cat(i)
   cat('\nAverage ROA: ')
   cat(averageROA)
+  cat('\nAverage Debt Ratio: ')
+  cat(averageDebtRatio)
   cat('\n')
   for (stock in stocks) {
     mktShare <- stock$marketcap/totalMarketCap
@@ -110,6 +127,9 @@ for (i in list.files('./sectors/rstockdata')) {
     cat(mktShare)
     cat('\nFinancial Strength\n')
     cat(stock$returnOnAssets - averageROA)
-    cat('\n\n')
+    cat('\n')
+    debtRatio <- stock$financials[1, 'totalDebt']/stock$financials[1, 'totalAssets']
+    cat(debtRatio - averageDebtRatio)
+    cat('\n')
   }
 }
