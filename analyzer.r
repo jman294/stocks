@@ -97,6 +97,19 @@ get_average_debt_ratio <- function (stock_data) {
 # Innovation
 # Percent headlines mentioning company and "new"
 
+get_average_rnd <- function (stock_data) {
+  sum <- 0
+  count <- 0
+  for (i in stock_data) {
+    if (!(is.na(i$financials[1, 'researchAndDevelopment']) ||
+          is.null(i$financials[1, 'researchAndDevelopment']))) {
+      sum = sum + i$financials[1, 'researchAndDevelopment']
+      count = count + 1
+    }
+  }
+  return(sum/count)
+}
+
 # Business model
 # Rated by user for now
 
@@ -113,23 +126,38 @@ for (i in list.files('./sectors/rstockdata')) {
   totalMarketCap <- get_total_market_cap(stocks)
   averageROA <- get_average_roa(stocks)
   averageDebtRatio <- get_average_debt_ratio(stocks)
+  averageRnd <- get_average_rnd(stocks)
   cat('\n\n\n')
   cat(i)
   cat('\nAverage ROA: ')
   cat(averageROA)
   cat('\nAverage Debt Ratio: ')
   cat(averageDebtRatio)
-  cat('\n')
+  cat('\nAverage RND: ')
+  cat(averageRnd)
+  cat('\n\n')
   for (stock in stocks) {
     mktShare <- stock$marketcap/totalMarketCap
-    cat(stock$symbol)
-    cat('\n')
-    cat(mktShare)
-    cat('\nFinancial Strength\n')
-    cat(stock$returnOnAssets - averageROA)
-    cat('\n')
+
     debtRatio <- stock$financials[1, 'totalDebt']/stock$financials[1, 'totalAssets']
-    cat(debtRatio - averageDebtRatio)
-    cat('\n')
+    useDebt <- !(is.na(stock$financials[1, 'totalDebt']) || is.na(stock$financials[1, 'totalAssets']) || is.null(stock$financials[1, 'totalDebt']) || is.null(stock$financials[1, 'totalAssets']))
+
+    useRnd <- !(is.na(stock$financials[1, 'researchAndDevelopment']) || is.null(stock$financials[1, 'researchAndDevelopment']))
+
+    if (useRnd && useDebt) {
+      score <- .4 * mktShare + .4 * (stock$returnOnAssets - averageROA) + .1 * debtRatio + .1 * rnd
+    } else if (useRnd) {
+      rnd <- sqrt(stock$financials[1, 'researchAndDevelopment']) - sqrt(averageRnd)
+      score <- .4 * mktShare + .4 * (stock$returnOnAssets - averageROA) + .2 * rnd
+    } else if (useDebt) {
+      score <- .4 * mktShare + .4 * (stock$returnOnAssets - averageROA) + .2 * debtRatio
+    } else {
+      score <- .55 * mktShare + .45 * (stock$returnOnAssets - averageROA)
+    }
+    cat(stock$symbol)
+    cat(' Score: \n')
+    cat(str(debtRatio), str(rnd), str(stock$financials[1, 'researchAndDevelopment']), str(mktShare), "\n");
+    cat(score*100)
+    cat('\n\n')
   }
 }
