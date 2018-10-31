@@ -65,7 +65,6 @@ get_total_market_cap <- function (stock_data) {
 }
 
 # Financial Strength
-# Debt to equity ratio maybe? Some other basic financial ratio
 get_average_roa <- function (stock_data) {
   sum <- 0
   count <- 0
@@ -93,6 +92,38 @@ get_average_debt_ratio <- function (stock_data) {
   return(sum/count)
 }
 
+get_average_profit_margin <- function (stock_data) {
+  sum <- 0
+  count <- 0
+  for (i in stock_data) {
+    if (!(is.na(i$financials[1, 'netIncome']) ||
+          is.null(i$financials[1, 'netIncome']) ||
+          is.null(i$financials[1, 'totalRevenue']) ||
+          is.na(i$financials[1, 'totalRevenue']))) {
+      sum = sum + i$financials[1, 'netIncome'] / i$financials[1, 'totalRevenue']
+      count = count + 1
+    }
+  }
+  return(sum/count)
+}
+
+# Past Growth
+get_average_cash_change <- function (stock) {
+  mean(as.vector(diff(stock$financials[, 'currentCash'])/c(0, stock$financials[, 'currentCash'], 0))[2:4])
+}
+
+get_average_cash_change_sector <- function (stocks) {
+  sum <- 0
+  count <- 0
+  for (stock in stocks) {
+    averageCashChangeStock <- get_average_cash_change(stock)
+    if (!(is.na(averageCashChangeStock) || is.null(averageCashChangeStock))) {
+      sum <- sum + averageCashChangeStock
+      count <- count + 1
+    }
+  }
+  return(sum/count)
+}
 
 # Innovation
 # Percent headlines mentioning company and "new"
@@ -121,12 +152,17 @@ if (length(list.files('sectors/rstockdata')) == 0) {
   cat('done')
 }
 
+stockScoresList <- data.frame("Symbol" = "NULL", "Score" = 1, "Industry" = "NULL", stringsAsFactors=FALSE)
+#stockScoresList <- data.frame(symbol='', score=1, industry='')[0, ]
+
 for (i in list.files('./sectors/rstockdata')) {
   stocks <- read_stock_data(paste('./sectors/rstockdata/', i, sep=''))
   totalMarketCap <- get_total_market_cap(stocks)
   averageROA <- get_average_roa(stocks)
   averageDebtRatio <- get_average_debt_ratio(stocks)
   averageRnd <- get_average_rnd(stocks)
+  averageCashChange <- get_average_cash_change_sector(stocks)
+  averageProfitMargin <- get_average_profit_margin(stocks)
   cat('\n\n\n')
   cat(i)
   cat('\nAverage ROA: ')
@@ -135,29 +171,52 @@ for (i in list.files('./sectors/rstockdata')) {
   cat(averageDebtRatio)
   cat('\nAverage RND: ')
   cat(averageRnd)
+  cat('\nAverage Cash Change: ')
+  cat(averageCashChange)
+  cat('\nAverage Profit Margin: ')
+  cat(averageProfitMargin)
   cat('\n\n')
   for (stock in stocks) {
     mktShare <- stock$marketcap/totalMarketCap
+
+    cashChange <- get_average_cash_change(stock) - averageCashChange
 
     debtRatio <- stock$financials[1, 'totalDebt']/stock$financials[1, 'totalAssets']
     useDebt <- !(is.na(stock$financials[1, 'totalDebt']) || is.na(stock$financials[1, 'totalAssets']) || is.null(stock$financials[1, 'totalDebt']) || is.null(stock$financials[1, 'totalAssets']))
 
     useRnd <- !(is.na(stock$financials[1, 'researchAndDevelopment']) || is.null(stock$financials[1, 'researchAndDevelopment']))
 
+    profitMarginDiff <- stock$financials[1, 'netIncome']/stock$financials[1, 'totalRevenue'] - averageProfitMargin
+    cat(mktShare, cashChange, debtRatio, useDebt, useRnd, profitMarginDiff, stock$returnOnAssets)
+
     if (useRnd && useDebt) {
-      score <- .4 * mktShare + .4 * (stock$returnOnAssets - averageROA) + .1 * debtRatio + .1 * rnd
-    } else if (useRnd) {
       rnd <- sqrt(stock$financials[1, 'researchAndDevelopment']) - sqrt(averageRnd)
-      score <- .4 * mktShare + .4 * (stock$returnOnAssets - averageROA) + .2 * rnd
-    } else if (useDebt) {
-      score <- .4 * mktShare + .4 * (stock$returnOnAssets - averageROA) + .2 * debtRatio
+      score <- .2 * mktShare + .3 * (stock$returnOnAssets - averageROA) + .1 * cashChange + .1 * debtRatio + .1 * rnd * .2 * profitMarginDiff
+    } else if (useRnd && !is.na(profitMarginDiff) && !is.na(cashChange)) {
+      rnd <- sqrt(stock$financials[1, 'researchAndDevelopment']) - sqrt(averageRnd)
+      score <- .3 * mktShare + .35 * (stock$returnOnAssets - averageROA) + .1 * cashChange + .1 * rnd + .15 * profitMarginDiff
+    } else if (useDebt && !is.na(profitMarginDiff) && !is.na(cashChange)) {
+      score <- .25 * mktShare + .35 * (stock$returnOnAssets - averageROA) + .1 * cashChange + .15 * debtRatio + .15 * profitMarginDiff
     } else {
-      score <- .55 * mktShare + .45 * (stock$returnOnAssets - averageROA)
+      score <- NA
+      stock$symbol <- NULL
     }
     cat(stock$symbol)
     cat(' Score: \n')
-    cat(str(debtRatio), str(rnd), str(stock$financials[1, 'researchAndDevelopment']), str(mktShare), "\n");
-    cat(score*100)
+    cat(score, '\n')
+    cat(stock$symbol, '\n')
+    cat(i, '\n', '\n')
     cat('\n\n')
+
+    #cat(length(list(stock$symbol, as.numeric(score), i)))
+    #cat(length(stockScoresList))
+    if (!is.na(score)) {
+      listing <- list(stock$symbol, as.numeric(score), i)
+      stockScoresList <- rbind(stockScoresList, listing, stringsAsFactors=FALSE)
+    }
   }
 }
+
+#cat(head(stockScoresList))
+stockScoresList <- stockScoresList[order(stockScoresList$Score, decreasing=TRUE),]
+saveRDS(stockScoresList, file='./output/sortedstocks.RData')
