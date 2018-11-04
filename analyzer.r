@@ -153,7 +153,6 @@ if (length(list.files('sectors/rstockdata')) == 0) {
 }
 
 stockScoresList <- data.frame("Symbol" = "NULL", "Score" = 1, "Industry" = "NULL", stringsAsFactors=FALSE)
-#stockScoresList <- data.frame(symbol='', score=1, industry='')[0, ]
 
 for (i in list.files('./sectors/rstockdata')) {
   stocks <- read_stock_data(paste('./sectors/rstockdata/', i, sep=''))
