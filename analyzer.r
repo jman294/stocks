@@ -162,23 +162,11 @@ for (i in list.files('./sectors/rstockdata')) {
   averageRnd <- get_average_rnd(stocks)
   averageCashChange <- get_average_cash_change_sector(stocks)
   averageProfitMargin <- get_average_profit_margin(stocks)
-  cat('\n\n\n')
-  cat(i)
-  cat('\nAverage ROA: ')
-  cat(averageROA)
-  cat('\nAverage Debt Ratio: ')
-  cat(averageDebtRatio)
-  cat('\nAverage RND: ')
-  cat(averageRnd)
-  cat('\nAverage Cash Change: ')
-  cat(averageCashChange)
-  cat('\nAverage Profit Margin: ')
-  cat(averageProfitMargin)
-  cat('\n\n')
+
   for (stock in stocks) {
     mktShare <- stock$marketcap/totalMarketCap
 
-    cashChange <- get_average_cash_change(stock) - averageCashChange
+    cashChange <- (get_average_cash_change(stock) - averageCashChange)/get_average_cash_change(stock)
 
     debtRatio <- stock$financials[1, 'totalDebt']/stock$financials[1, 'totalAssets']
     useDebt <- !(is.na(stock$financials[1, 'totalDebt']) || is.na(stock$financials[1, 'totalAssets']) || is.null(stock$financials[1, 'totalDebt']) || is.null(stock$financials[1, 'totalAssets']))
@@ -186,29 +174,24 @@ for (i in list.files('./sectors/rstockdata')) {
     useRnd <- !(is.na(stock$financials[1, 'researchAndDevelopment']) || is.null(stock$financials[1, 'researchAndDevelopment']))
 
     profitMarginDiff <- stock$financials[1, 'netIncome']/stock$financials[1, 'totalRevenue'] - averageProfitMargin
-    cat(mktShare, cashChange, debtRatio, useDebt, useRnd, profitMarginDiff, stock$returnOnAssets)
 
+    cat(mktShare, roa, cashChange, debtRatio, rnd, profitMarginDiff, stock$symbol, '\n')
     if (useRnd && useDebt) {
-      rnd <- sqrt(stock$financials[1, 'researchAndDevelopment']) - sqrt(averageRnd)
-      score <- .2 * mktShare + .3 * (stock$returnOnAssets - averageROA) + .1 * cashChange + .1 * debtRatio + .1 * rnd * .2 * profitMarginDiff
+      rnd <- (stock$financials[1, 'researchAndDevelopment'] - averageRnd)/stock$financials[1, 'researchAndDevelopment']
+      roa <- (stock$returnOnAssets - averageROA)/stock$returnOnAssets
+      score <- .2 * mktShare + .3 * roa + .1 * cashChange + .1 * debtRatio + .1 * rnd * .2 * profitMarginDiff
     } else if (useRnd && !is.na(profitMarginDiff) && !is.na(cashChange)) {
-      rnd <- sqrt(stock$financials[1, 'researchAndDevelopment']) - sqrt(averageRnd)
-      score <- .3 * mktShare + .35 * (stock$returnOnAssets - averageROA) + .1 * cashChange + .1 * rnd + .15 * profitMarginDiff
+      rnd <- (stock$financials[1, 'researchAndDevelopment'] - averageRnd)/stock$financials[1, 'researchAndDevelopment']
+      roa <- (stock$returnOnAssets - averageROA)/stock$returnOnAssets
+      score <- .3 * mktShare + .35 * roa + .1 * cashChange + .1 * rnd + .15 * profitMarginDiff
     } else if (useDebt && !is.na(profitMarginDiff) && !is.na(cashChange)) {
-      score <- .25 * mktShare + .35 * (stock$returnOnAssets - averageROA) + .1 * cashChange + .15 * debtRatio + .15 * profitMarginDiff
+      roa <- (stock$returnOnAssets - averageROA)/stock$returnOnAssets
+      score <- .25 * mktShare + .35 * roa + .1 * cashChange + .15 * debtRatio + .15 * profitMarginDiff
     } else {
       score <- NA
       stock$symbol <- NULL
     }
-    cat(stock$symbol)
-    cat(' Score: \n')
-    cat(score, '\n')
-    cat(stock$symbol, '\n')
-    cat(i, '\n', '\n')
-    cat('\n\n')
 
-    #cat(length(list(stock$symbol, as.numeric(score), i)))
-    #cat(length(stockScoresList))
     if (!is.na(score)) {
       listing <- list(stock$symbol, as.numeric(score), i)
       stockScoresList <- rbind(stockScoresList, listing, stringsAsFactors=FALSE)
@@ -216,6 +199,5 @@ for (i in list.files('./sectors/rstockdata')) {
   }
 }
 
-#cat(head(stockScoresList))
 stockScoresList <- stockScoresList[order(stockScoresList$Score, decreasing=TRUE),]
 saveRDS(stockScoresList, file='./output/sortedstocks.RData')

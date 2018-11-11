@@ -26,13 +26,50 @@ get_stock_data <- function (stock) {
 }
 
 # Program
-sortedStocks <- readRDS('./sortedstocks.RData')
+sortedStocks <- readRDS('./output/sortedstocks.RData')
 
-apply(sortedStocks, 1, function (value) {
+stockScoresList <- data.frame("Symbol" = "NULL", "Percent" = 0, "Price" = 0, stringsAsFactors=FALSE)
+
+sum <- 0
+toConsider <- 10
+
+pot <- 60000
+
+for (i in 1:toConsider) {
+  value <- sortedStocks[i,]
   stockData <- get_stock_data(value[1])
-  percentOffHigh <- (stockData$price - stockData$week52high) / stockData$price
-  movingSlope <- stockData$price - stockData$day200MovingAverage
-  cat(percentOffHigh)
 
-  #cat(str(stockData))
-})
+  score <- value[2]
+  percentOffHigh <- (stockData$week52high - stockData$price) / stockData$price
+  if (percentOffHigh <= 0) {
+    percentOffHigh <- sqrt(abs(percentOffHigh))
+  }
+
+  priceDifference <- stockData$price - stockData$day200MovingAvg
+  if (priceDifference <= 0) {
+    priceDifference <- sqrt(abs(priceDifference))
+  }
+
+  averageDifference <- stockData$day50MovingAvg - stockData$day200MovingAvg
+  if (averageDifference <= 0) {
+    averageDifference <- sign(averageDifference) * abs(averageDifference)^(1/3)
+  }
+
+  cat(percentOffHigh, priceDifference, averageDifference, '\n')
+
+  resultScore <- .15 * as.numeric(score) + .4 * percentOffHigh + .25 * priceDifference + .2 * averageDifference
+
+  sum <- sum + resultScore
+  if (!is.na(resultScore)) {
+    listing <- list(stockData$symbol, as.numeric(resultScore), as.numeric(stockData$price))
+    stockScoresList <- rbind(stockScoresList, listing, stringsAsFactors=FALSE)
+  }
+}
+
+newStockScoresList <- data.frame("Symbol" = "NULL", "Percent" = 0, "PTotal" = 0, "NumShares" = 0, stringsAsFactors=FALSE)
+for (i in 1:nrow(stockScoresList)) {
+  percent <- stockScoresList[i, "Percent"]/sum
+  total <- percent * pot
+  listing <- list(stockScoresList[i, "Symbol"], as.numeric(percent), total, total / stockScoresList[i, "Price"])
+  newStockScoresList <- rbind(newStockScoresList, listing, stringsAsFactors=FALSE)
+}
