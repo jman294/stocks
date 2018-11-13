@@ -194,7 +194,9 @@ for (i in list.files('./sectors/rstockdata')) {
 
     if (!is.na(score)) {
       listing <- list(stock$symbol, as.numeric(score), i)
-      stockScoresList <- rbind(stockScoresList, listing, stringsAsFactors=FALSE)
+      if (!stock$symbol %in% stockScoresList[, "Symbol"]) {
+        stockScoresList <- rbind(stockScoresList, listing, stringsAsFactors=FALSE)
+      }
     }
   }
 }

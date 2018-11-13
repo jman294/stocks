@@ -42,22 +42,26 @@ for (i in 1:toConsider) {
   score <- value[2]
   percentOffHigh <- (stockData$week52high - stockData$price) / stockData$price
   if (percentOffHigh <= 0) {
-    percentOffHigh <- sqrt(abs(percentOffHigh))
+    percentOffHigh <- (abs(percentOffHigh))/2
   }
 
   priceDifference <- stockData$price - stockData$day200MovingAvg
   if (priceDifference <= 0) {
-    priceDifference <- sqrt(abs(priceDifference))
+    priceDifference <- abs(priceDifference)/2
   }
 
   averageDifference <- stockData$day50MovingAvg - stockData$day200MovingAvg
   if (averageDifference <= 0) {
-    averageDifference <- sign(averageDifference) * abs(averageDifference)^(1/3)
+    averageDifference <- abs(averageDifference)/2
   }
 
-  cat(percentOffHigh, priceDifference, averageDifference, '\n')
+  if (stockData$EPSSurprisePercent <= 0) {
+    stockData$EPSSurprisePercent <- sqrt(abs(stockData$EPSSurprisePercent))
+  }
 
-  resultScore <- .15 * as.numeric(score) + .4 * percentOffHigh + .25 * priceDifference + .2 * averageDifference
+  cat(stockData$EPSSurprisePercent, '\n')
+
+  resultScore <- .4 * ((averageDifference + priceDifference)/2) + .35 * stockData$EPSSurprisePercent/100 + .25 * percentOffHigh
 
   sum <- sum + resultScore
   if (!is.na(resultScore)) {
@@ -73,3 +77,5 @@ for (i in 1:nrow(stockScoresList)) {
   listing <- list(stockScoresList[i, "Symbol"], as.numeric(percent), total, total / stockScoresList[i, "Price"])
   newStockScoresList <- rbind(newStockScoresList, listing, stringsAsFactors=FALSE)
 }
+
+newStockScoresList <- newStockScoresList[3:12,]
