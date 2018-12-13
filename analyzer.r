@@ -175,7 +175,6 @@ for (i in list.files('./sectors/rstockdata')) {
 
     profitMarginDiff <- stock$financials[1, 'netIncome']/stock$financials[1, 'totalRevenue'] - averageProfitMargin
 
-    cat(mktShare, roa, cashChange, debtRatio, rnd, profitMarginDiff, stock$symbol, '\n')
     if (useRnd && useDebt) {
       rnd <- (stock$financials[1, 'researchAndDevelopment'] - averageRnd)/stock$financials[1, 'researchAndDevelopment']
       roa <- (stock$returnOnAssets - averageROA)/stock$returnOnAssets
